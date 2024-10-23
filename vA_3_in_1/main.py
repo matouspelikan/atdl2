@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from torch_geometric.utils import to_undirected, remove_self_loops, add_self_loops, subgraph, dropout_adj
 from torch_scatter import scatter
 import copy
+import json
 
 from logger import Logger, SimpleLogger
 from dataset import load_dataset
@@ -60,6 +61,9 @@ else:
         split_idx_lst = load_fixed_splits(args.data_dir, dataset, name=args.dataset, protocol=args.protocol)[0]
     elif args.dataset in ['chameleon', 'squirrel', 'film', 'cornell', 'texas', 'wisconsin'] and args.protocol == 'supervised':
         split_idx_lst = load_fixed_splits(args.data_dir, dataset, name=args.dataset, protocol=args.protocol)
+    else:
+        print("PROBLEM")
+
 
 if args.dataset == 'ogbn-proteins':
     edge_index_ = to_sparse_tensor(dataset.graph['edge_index'],
@@ -161,14 +165,14 @@ for run in range(args.runs):
                 best_out = result[-1]
 
         if epoch % args.display_step == 0:
-            print(f'Epoch: {epoch:02d}, '
-                  f'Loss: {loss:.4f}, '
-                  f'Train: {100 * result[0]:.2f}%, '
-                  f'Valid: {100 * result[1]:.2f}%, '
-                  f'Test: {100 * result[2]:.2f}%')
+            # print(f'Epoch: {epoch:02d}, '
+            #       f'Loss: {loss:.4f}, '
+            #       f'Train: {100 * result[0]:.2f}%, '
+            #       f'Valid: {100 * result[1]:.2f}%, '
+            #       f'Test: {100 * result[2]:.2f}%')
             if args.print_prop:
                 pred = out.argmax(dim=-1, keepdim=True)
-                print("Predicted proportions:", pred.unique(return_counts=True)[1].float() / pred.shape[0])
+                # print("Predicted proportions:", pred.unique(return_counts=True)[1].float() / pred.shape[0])
     logger.print_statistics(run)
 
 results = logger.print_statistics()
@@ -178,9 +182,14 @@ para_num = count_parameters(model)
 
 ### Save results ###
 filename = f'results/{args.dataset}.csv'
-print(f"Saving results to {filename}")
+# print(f"Saving results to {filename}")
 with open(f"{filename}", 'a+') as write_obj:
     dataset_str = f'{args.dataset}'
     dataset_str += f'{args.sub_dataset},' if args.sub_dataset else ''
     write_obj.write(f"method{args.train_prop if args.rand_split else ''}:{args.method}(trans:{args.trans},cv_tr:{args.conv_tr},cv_va:{args.conv_va},cv_te:{args.conv_te}),\t lr:{args.lr},\t wd:{args.weight_decay},\t dpo:{args.dropout},\t l:{args.num_layers},\t o:{args.num_mps},\t hc:{args.hidden_channels},\t performance: {results.mean():.2f} $\pm$ {results.std():.2f},\t train time:{train_time: .6f},\t para_num:{para_num: .2f}\n")
-                    
+
+output = {
+    'mean_performance': f"{results.mean():.2f}",
+    'std_performance': f"{results.std():.2f}"
+}
+print(json.dumps(output))
